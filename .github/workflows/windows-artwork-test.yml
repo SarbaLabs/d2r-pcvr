@@ -34,6 +34,13 @@ jobs:
         run: |
           ./steamvr/build_windows.ps1
           ./steamvr/build_casclib.ps1
+          & ./deps/cmake-4.4.4-windows-x86_64/bin/cmake.exe -S cmake/openxr-loader -B build-frame/openxr-loader -G Ninja "-DCMAKE_MAKE_PROGRAM=$PWD/deps/ninja/ninja.exe" "-DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/windows-llvm-toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
+          if ($LASTEXITCODE -ne 0) { throw 'OpenXR loader configure failed' }
+          & ./deps/cmake-4.4.4-windows-x86_64/bin/cmake.exe --build build-frame/openxr-loader --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'OpenXR loader build failed' }
+          $loader = @(Get-ChildItem build-frame/openxr-loader -Recurse -Filter openxr_loader.dll)
+          if ($loader.Count -ne 1) { throw 'Expected one built OpenXR loader' }
+          Copy-Item $loader[0].FullName build-frame/windows-native/openxr_loader.dll
       - name: Install verified Inno Setup
         run: |
           $url = 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe'
