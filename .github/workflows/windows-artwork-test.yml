@@ -9,13 +9,16 @@ jobs:
   installer:
     runs-on: windows-latest
     timeout-minutes: 45
+    env:
+      TEMP: ${{ runner.temp }}
+      TMP: ${{ runner.temp }}
     defaults:
       run:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: baf6f296bbec583ab4f25243ab4969543c4ec68a
+          ref: 33b645c78f708dbebed29a69fef27fd184941722
           fetch-depth: 0
       - name: Install pinned project tools
         run: ./steamvr/setup_windows_tools.ps1
