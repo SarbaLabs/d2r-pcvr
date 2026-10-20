@@ -18,18 +18,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 050644af143082163cfc0f77f2e20618c24890d7
+          ref: b2a0528b6b73d5898516c62d804a8f7ca4e6b02f
           fetch-depth: 0
       - name: Install pinned project tools
         run: ./steamvr/setup_windows_tools.ps1
       - name: Installer fixture tests
         run: |
-          foreach ($test in @('steam_artwork_test.py', 'setup_windows_test.py', 'setup_native_test.py', 'uninstall_windows_test.py', 'battlenet_test.py')) {
+          foreach ($test in @('steam_artwork_test.py', 'steam_shortcut_migration_test.py', 'setup_windows_test.py', 'setup_native_test.py', 'uninstall_windows_test.py', 'battlenet_test.py')) {
             & ./deps/python/python.exe -m unittest discover -s steamvr -p $test
             if ($LASTEXITCODE -ne 0) { throw "Fixture failed: $test" }
           }
           & ./deps/python/python.exe -m unittest discover -s installer -p '*_test.py'
           if ($LASTEXITCODE -ne 0) { throw 'Installer staging tests failed' }
+      - name: PowerShell compiler version regression tests
+        run: |
+          & pwsh -NoProfile -File installer/compiler_version_test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Compiler version tests failed' }
       - name: Build native plugin and CascLib using project scripts
         run: |
           ./steamvr/build_windows.ps1
@@ -49,11 +53,20 @@ jobs:
           $dir = Join-Path $PWD 'deps/inno-7.1.0'
           $process = Start-Process deps/downloads/innosetup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$dir") -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw 'Inno Setup installation failed' }
+      - name: Verify actual pinned Inno compiler version
+        run: |
+          $compiler = Join-Path $PWD 'deps/inno-7.1.0/ISCC.exe'
+          $actualVersion = (& $compiler --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actualVersion -ne '7.1.0') { throw "Unexpected pinned compiler version: $actualVersion" }
+          Write-Host "Verified compiler: $compiler -> $actualVersion"
       - name: Package and compile official installer
         run: |
           & ./deps/python/python.exe steamvr/package.py --build build-frame/windows-native --openxr-loader build-frame/windows-native/openxr_loader.dll --casclib build-frame/casclib-installer/CascLib.dll --release-tag v0.3.20-windows-preview --output build-frame/releases/artwork-test.zip
           if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
-          ./installer/build_native_installer.ps1 -PackagePath build-frame/releases/artwork-test.zip -Version 0.3.20
+          ./installer/build_native_installer.ps1 -PackagePath build-frame/releases/artwork-test.zip -Version 0.3.20 -ISCCPath ./deps/inno-7.1.0/ISCC.exe
+          $report = Get-Content build-frame/installers/D2R-PCVR-Setup-0.3.20.exe.build.json -Raw | ConvertFrom-Json
+          if ($report.compiler -ne '7.1.0') { throw "Incorrect compiler provenance: $($report.compiler)" }
+          Write-Host "Build report compiler version verified: $($report.compiler)"
       - name: Verify ten staged artwork files against source
         run: |
           $payload = Get-ChildItem build-frame/installer-staging -Directory | Select-Object -Last 1
