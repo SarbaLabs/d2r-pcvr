@@ -1,0 +1,68 @@
+name: Windows artwork test installer
+on:
+  push:
+    branches: [build/windows-steam-artwork-test]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: baf6f296bbec583ab4f25243ab4969543c4ec68a
+          fetch-depth: 0
+      - name: Install pinned project tools
+        run: ./steamvr/setup_windows_tools.ps1
+      - name: Installer fixture tests
+        run: |
+          foreach ($test in @('steam_artwork_test.py', 'setup_windows_test.py', 'setup_native_test.py', 'uninstall_windows_test.py', 'battlenet_test.py')) {
+            & ./deps/python/python.exe -m unittest discover -s steamvr -p $test
+            if ($LASTEXITCODE -ne 0) { throw "Fixture failed: $test" }
+          }
+          & ./deps/python/python.exe -m unittest discover -s installer -p '*_test.py'
+          if ($LASTEXITCODE -ne 0) { throw 'Installer staging tests failed' }
+      - name: Build native plugin and CascLib using project scripts
+        run: |
+          ./steamvr/build_windows.ps1
+          ./steamvr/build_casclib.ps1
+      - name: Install verified Inno Setup
+        run: |
+          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe'
+          Invoke-WebRequest $url -OutFile deps/downloads/innosetup.exe
+          if ((Get-FileHash deps/downloads/innosetup.exe -Algorithm SHA256).Hash.ToLowerInvariant() -ne '0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f') { throw 'Inno Setup hash mismatch' }
+          $dir = Join-Path $PWD 'deps/inno-7.1.0'
+          $process = Start-Process deps/downloads/innosetup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$dir") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'Inno Setup installation failed' }
+      - name: Package and compile official installer
+        run: |
+          & ./deps/python/python.exe steamvr/package.py --build build-frame/windows-native --openxr-loader build-frame/windows-native/openxr_loader.dll --casclib build-frame/casclib-installer/CascLib.dll --release-tag v0.3.20-windows-preview --output build-frame/releases/artwork-test.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+          ./installer/build_native_installer.ps1 -PackagePath build-frame/releases/artwork-test.zip -Version 0.3.20
+      - name: Verify ten staged artwork files against source
+        run: |
+          $payload = Get-ChildItem build-frame/installer-staging -Directory | Select-Object -Last 1
+          $count = 0
+          foreach ($runtime in @('SteamVR', 'Virtual-Desktop')) {
+            foreach ($asset in @('Background', 'Cover', 'Wide-Cover', 'Icon', 'Logo')) {
+              $relative = "artwork/$runtime/$asset.png"
+              $candidates = @(Get-ChildItem $payload.FullName -Recurse -File | Where-Object { $_.FullName.Replace('\','/').EndsWith("/$relative") })
+              if ($candidates.Count -ne 1) { throw "Missing or duplicate staged asset: $relative" }
+              if ((Get-FileHash $relative).Hash -ne (Get-FileHash $candidates[0].FullName).Hash) { throw "Changed artwork: $relative" }
+              $count++
+            }
+          }
+          if ($count -ne 10) { throw 'Expected ten artworks' }
+      - name: Installer lifecycle fixture
+        run: ./installer/smoke_native_installer.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: D2R-PCVR-Windows-artwork-test
+          path: build-frame/installers/*
+          if-no-files-found: error
+          retention-days: 14
