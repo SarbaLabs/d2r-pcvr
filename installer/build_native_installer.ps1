@@ -33,8 +33,8 @@ if (!$ISCCPath) {
 if (!(Test-Path -LiteralPath $ISCCPath)) {
     throw 'Install Inno Setup 7.1 or later and pass -ISCCPath to its ISCC.exe. See installer/README.md.'
 }
-$compilerVersion = & $ISCCPath --version
-if ($LASTEXITCODE -ne 0) { throw 'Could not determine the Inno Setup compiler version' }
+$compilerVersion = (Get-Item -LiteralPath $ISCCPath).VersionInfo.FileVersion
+if (!$compilerVersion) { throw 'Could not determine the Inno Setup compiler version' }
 $launcherArguments = @()
 if ($LauncherSetup -or $LauncherSetupSha256) {
     # The D2R VR Launcher's own Setup, carried unmodified from https://github.com/natpoh/d2r-vr-launcher/releases and installed silently
