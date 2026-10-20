@@ -345,7 +345,7 @@ def main():
     preview = steam_config.update_shortcuts(
         (profile / 'config/shortcuts.vdf').read_bytes() if (profile / 'config/shortcuts.vdf').exists() else None,
         steam, game, connections, **routing)
-    steam_config.artwork_updates(preview, profile, steam, game, connections, root / 'artwork', **routing)
+    steam_config.artwork_updates(preview, profile, steam, game, connections, ROOT / 'artwork', **routing)
     if mode != 2:
         print('  Required loader / ReShade components are downloaded from their official sites and checksum-checked.')
     if choose('Continue with this setup?', ['Install and configure shortcuts', 'Cancel']) == 1:
