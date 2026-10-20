@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 import copy
+import ntpath
 import os
 from pathlib import Path
 import re
@@ -199,6 +200,36 @@ def shortcut_specs(steam, game, store='steam', python=None, wrapper=None, runtim
     return result
 
 
+def is_same_battlenet_shortcut(item, game, connection):
+    """Recognize generated routing for the same Battle.net game."""
+    exe = item.get('Exe', '')
+    options = item.get('LaunchOptions', '')
+    if not isinstance(exe, str) or not isinstance(options, str):
+        return False
+    executable = re.fullmatch(r'"([^"\r\n]+)"', exe)
+    if not executable or ntpath.basename(executable[1]).lower() not in {
+            'python.exe', 'pythonw.exe'}:
+        return False
+    token = r'(?:"[^"\r\n]+"|[^\s"]+)'
+    game_arg = subprocess.list2cmdline(['--battlenet-game=' + str(game)])
+    command = re.fullmatch(
+        rf'(?P<wrapper>{token}) {re.escape(game_arg)} '
+        rf'--experimental-battlenet --frame-vr (?P<runtime>{token})',
+        options)
+    if not command:
+        return False
+    wrapper = command['wrapper'].strip('"')
+    if (ntpath.basename(wrapper).lower() != 'launch_windows.py'
+            or ntpath.basename(ntpath.dirname(wrapper)).lower() != 'steamvr'):
+        return False
+    runtime = command['runtime'].strip('"')
+    if connection == 'vdxr':
+        return runtime == '--frame-vdxr'
+    prefix = '--frame-openxr-runtime='
+    return (connection == 'steamvr' and runtime.startswith(prefix)
+            and len(runtime) > len(prefix))
+
+
 def update_shortcuts(original, steam, game, connections, **routing):
     specs = shortcut_specs(steam, game, **routing)
     if not set(connections).issubset(specs):
@@ -219,7 +250,11 @@ def update_shortcuts(original, steam, game, connections, **routing):
         key = matches[0] if matches else str(max(map(int, entries), default=-1) + 1)
         item = entries.setdefault(key, {})
         exe = '"' + str(executable) + '"'
-        if item and (item.get('Exe') != exe or item.get('LaunchOptions') != options):
+        same_command = (item.get('Exe') == exe
+                        and item.get('LaunchOptions') == options)
+        same_game = (routing.get('store') == 'battlenet'
+                     and is_same_battlenet_shortcut(item, game, connection))
+        if item and not (same_command or same_game):
             raise ValueError(f'A different shortcut already uses the name {name}. Rename it in Steam before setup.')
         appid = item.get('appid', zlib.crc32((exe + name).encode('utf-8')) | 0x80000000)
         if not isinstance(appid, int) or not 0x80000000 <= appid <= 0xffffffff:
