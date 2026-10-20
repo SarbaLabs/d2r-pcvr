@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 33b645c78f708dbebed29a69fef27fd184941722
+          ref: 694dbb144791ea233d975c1280600a431e23b703
           fetch-depth: 0
       - name: Install pinned project tools
         run: ./steamvr/setup_windows_tools.ps1
