@@ -138,3 +138,15 @@ The texture header/format mapping was checked against
 Original potion models and textures belong to the game and are extracted into
 the local `d2r_vr_potions` cache; neither that cache nor raw game assets are
 distributed in the repository or release. No Granny runtime is needed.
+
+## Linux Qt test installer
+
+The optional Linux installer uses PySide6 / Qt 6 and Shiboken (LGPLv3/GPLv3 or
+commercial terms) as replaceable shared libraries, and PyInstaller (GPLv2 with
+its bootloader distribution exception). The bundle includes upstream runtime
+license texts under `_internal/payload/runtime-licenses`; installer source is in
+`steamvr/*linux*.py` and `installer/build_linux_setup.py`. Qt source and licensing:
+https://code.qt.io/ and https://www.qt.io/licensing/open-source-lgpl-obligations.
+Python retains its PSF license. The installer bundles no proprietary game assets.
+Linux UI, language preferences and runtime routing were adapted from the
+MIT-licensed SarbaKhan/d2r-pcvr-plus installer; no Plus gameplay code is included.

@@ -1,4 +1,115 @@
-# Linux installation notes
+# Linux Qt installer — personal test
+
+This branch adds a Qt installer for **D2R VR Unleashed**, using the original
+installer backend and the unmodified upstream 0.3.24 Windows DLL under Proton.
+No PCVR Plus gameplay or flat-screen mode is included. Linux/headset acceptance
+is pending; successful packaging tests do not establish VR compatibility.
+
+## Install, repair or remove
+
+1. Use native Steam on Linux x86-64, install the Steam edition of Diablo II:
+   Resurrected, select your Proton version, and launch the unmodded game once.
+2. Extract the complete `D2R-VR-Unleashed-Linux-Setup.tar.gz` archive. Keep its
+   executable and `_internal` folder together. Run `D2R-VR-Unleashed-Linux-Setup`
+   as your normal user, **not root**. Python and Qt are bundled.
+3. Select the Steam data folder, game folder, existing Saved Games folder and
+   Steam account. Select SteamVR, WiVRn, or both and their Linux OpenXR manifests.
+4. Choose update/repair (keeps calibration and video settings), full install
+   (recommended defaults), shortcuts only, or uninstall. Text and voice languages
+   are independent D2RLoader overrides; there is no keyboard-layout option.
+5. Review the existing Steam launch options. Exit Steam completely and close
+   the game before continuing. The installer never kills them.
+6. Start Steam and connect your headset. Use the matching new Steam or KDE
+   application-menu shortcut. WiVRn entries include `X-WiVRn-VR` for headset
+   launcher discovery. WiVRn must be connected and active as the host OpenXR
+   runtime. VR launches disable Proton native Wayland; use XWayland.
+
+Setup installs its permanent runtime into `D2R-PCVR-Linux` inside the game folder.
+The extracted download can then be removed. Re-run setup to repair or uninstall.
+The original Steam game entry remains unmodded. Shortcuts use that game's Proton
+selection and existing prefix, rather than creating a second game installation.
+SteamVR/WiVRn and the chosen Proton version must already be installed.
+Flatpak Steam and Battle.net are outside this test's scope.
+
+Each runtime gets the five original PNG artworks without resizing or alpha
+conversion. Only the selected Steam account is configured. Repair keeps shortcut
+IDs. Name conflicts and ID collisions stop setup before game changes. Other
+applications and user replacements are preserved during removal.
+
+The upstream installer creates recovery snapshots (including saves). Removal
+restores mod files, **never character progress**, and keeps current video settings.
+Recovery backups and the setup runtime remain in `D2R-PCVR-Linux` after removal.
+For a pre-existing unmanaged mod, retain its original backup directories: removal
+needs the first pre-mod snapshot. Do not delete those backups during upgrades.
+
+## HTTPS / certificate errors
+
+The download worker uses the distribution's CA store, including Arch/CachyOS and
+Fedora paths, and keeps hostname verification and pinned SHA-256 checks enabled.
+Explicit `SSL_CERT_FILE` / `SSL_CERT_DIR` overrides are respected and checked.
+An invalid override or certificate error stops installation rather than silently
+turning off verification. Update `ca-certificates` and check your system clock.
+You can diagnose the packaged downloader without installing anything:
+
+```sh
+./D2R-VR-Unleashed-Linux-Setup --tls-check
+```
+
+If the server's certificate chain is still invalid, verified dependency files
+can be placed in the managed `deps` cache; the original installer accepts only
+its explicitly pinned hashes. Do not use an insecure download workaround.
+
+## Build from source
+
+Use Python 3.10+ and a virtual environment. Build on the oldest supported glibc
+system; this test bundle is built on Ubuntu 24.04 (glibc 2.39) and targets modern
+x86-64 distributions, including CachyOS. It is not an AppImage.
+
+Ubuntu 24.04:
+
+```sh
+sudo apt install python3 python3-venv ca-certificates libegl1 libgl1 libxcb-cursor0 libxkbcommon-x11-0
+```
+
+Fedora:
+
+```sh
+sudo dnf install python3 python3-pip ca-certificates mesa-libEGL mesa-libGL xcb-util-cursor libxkbcommon-x11
+```
+
+Arch / CachyOS:
+
+```sh
+sudo pacman -S --needed python python-pip ca-certificates mesa libglvnd xcb-util-cursor libxkbcommon-x11
+```
+
+From the checkout, download the official `v0.3.24-windows-preview`
+`d2r-pcvr-windows.zip` release from bearstonem/d2r-pcvr, then:
+
+```sh
+python3 -m venv build-frame/linux-venv
+build-frame/linux-venv/bin/pip install -r installer/linux-requirements.txt
+build-frame/linux-venv/bin/python installer/build_linux_setup.py --package /path/to/d2r-pcvr-windows.zip
+```
+
+The build pins the upstream ZIP hash, verifies its file manifest, preserves DLL
+provenance, bundles Python/Qt and their license notices, checks all ten artwork
+files, and exercises the Qt wizard and stock launch route. Output is under
+`build-frame/linux-setup/`. No game assets or character files are bundled.
+
+```sh
+python3 -m unittest discover -s steamvr -p 'linux_*test.py'
+QT_QPA_PLATFORM=offscreen build-frame/linux-venv/bin/python steamvr/linux_setup_entry.py --gui-smoke
+```
+
+The GUI can be previewed from source; installation uses the built bundle so its
+permanent launcher does not depend on the build machine's Python path.
+
+---
+
+## Historical manual installation notes
+
+The following notes describe the older manual workflow, not the Qt installer above.
 
 For the current Windows release, use [INSTALL-WINDOWS.md](INSTALL-WINDOWS.md).
 These Linux/Proton instructions are retained for development. Earlier
